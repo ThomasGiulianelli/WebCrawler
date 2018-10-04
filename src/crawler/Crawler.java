@@ -2,6 +2,8 @@ package crawler;
 
 import java.io.IOException;
 import java.util.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -9,19 +11,32 @@ import org.jsoup.select.Elements;
 import org.jsoup.nodes.Element;
 
 public class Crawler {
-	
+	protected static Boolean domainConstant = false; //can be set to true with "-d" flag
 	protected static LinkedList<String> queue = new LinkedList<String>();
 	protected static int pagesVisited = 0;
+	protected static String domainName;
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws URISyntaxException {
 		String url;
+		String flag = "";
 		int maxPages = 100;
 		
-		if (args.length == 1)
+		if (args.length == 1) {
 			url = args[0];
-		else url = "https://old.reddit.com";
+		}
+		else if (args.length == 2) {
+			url = args[0];
+			flag = args[1];
+		}
+		else {url = "https://old.reddit.com";}
 		
-		System.out.println("running...");
+		if (flag.equals("-d")) {
+			domainConstant = true; //sets crawler to only traverse pages with the same domain as the original page
+		}
+		
+		domainName = getDomainName(url);
+		System.out.println("Domain: " + domainName);
+		System.out.println("Only crawling pages with same domain: " + domainConstant + ".\n");
 		
 		//put first url in the queue
 		queue.add(url);
@@ -30,7 +45,7 @@ public class Crawler {
 		while(queue.peekFirst() != null && pagesVisited < maxPages) {
 			getLinks(queue.pollFirst()); //retrieves and removes first element of the queue
 		}
-		System.out.println("done.");
+		System.out.println("Done.");
 	}
 	
 	private static void getLinks(String url) {
@@ -47,12 +62,18 @@ public class Crawler {
 			
 			//add each link to the queue
 	        for (Element link : links) {
-	            queue.add(link.attr("abs:href"));
-	        	System.out.printf(" * a: <%s>  (%s)", link.attr("abs:href"), trim(link.text(), 35));
+	            String currLink = link.attr("abs:href");
+	            
+	        	//checks if the link's domain name is different than original domain before adding it to queue
+	            if(domainConstant && !getDomainName(currLink).equals(domainName)) 
+	        		continue;
+	        	
+	        	queue.add(currLink);
+	        	System.out.printf(" * a: <%s>  (%s)", currLink, trim(link.text(), 35));
 	        }  
 	        System.out.print("\n\n");
 	        pagesVisited++;
-		} catch (IOException e) {
+		} catch (IOException | URISyntaxException e) {
 			e.printStackTrace();
 		}
 	}
@@ -63,4 +84,10 @@ public class Crawler {
         else
             return s;
     }
+	
+	public static String getDomainName(String url) throws URISyntaxException {
+	    URI uri = new URI(url);
+	    String domain = uri.getHost();
+	    return domain.startsWith("www.") ? domain.substring(4) : domain;
+	}
 }
